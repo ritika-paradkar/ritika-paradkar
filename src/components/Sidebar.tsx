@@ -1,4 +1,4 @@
-import { Scale, LayoutDashboard, Upload, FolderSearch } from "lucide-react";
+import { Scale, LayoutDashboard, Upload, FolderSearch, Users, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -8,8 +8,10 @@ interface SidebarProps {
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { id: "upload", label: "Upload", icon: Upload },
+  { id: "upload", label: "Upload & Verify", icon: Upload },
+  { id: "repository", label: "Repository", icon: Database },
   { id: "similar", label: "Similar Cases", icon: FolderSearch },
+  { id: "lawyers", label: "Lawyers", icon: Users },
 ];
 
 export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
