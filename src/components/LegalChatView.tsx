@@ -113,8 +113,8 @@ export default function LegalChatView() {
                   <Bot className="w-4 h-4 text-primary" />
                 </div>
               )}
-              <div className={`max-w-[75%] p-3 rounded-lg text-sm whitespace-pre-wrap ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary/60 border border-border/50"}`}>
-                {msg.content}
+              <div className={`max-w-[75%] p-3 rounded-lg text-sm ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary/60 border border-border/50 prose prose-sm prose-invert max-w-none"}`}>
+                {msg.role === "assistant" ? <ReactMarkdown>{msg.content}</ReactMarkdown> : msg.content}
               </div>
               {msg.role === "user" && (
                 <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
