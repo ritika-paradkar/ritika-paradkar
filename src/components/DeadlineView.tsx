@@ -55,10 +55,10 @@ export default function DeadlineView() {
     return "bg-secondary/40 border-border/50 text-muted-foreground";
   };
 
-  const renderSection = (title: string, items: Deadline[], icon: typeof AlertTriangle, color: string) => items.length > 0 ? (
+  const renderSection = (title: string, items: Deadline[], IconComp: typeof AlertTriangle, color: string) => items.length > 0 ? (
     <div className="glass-card p-5">
       <h3 className={`text-sm font-semibold mb-3 flex items-center gap-2 ${color}`}>
-        {<icon className="w-3.5 h-3.5" />}{title}
+        <IconComp className="w-3.5 h-3.5" />{title}
         <span className="text-xs ml-auto text-muted-foreground">{items.length} items</span>
       </h3>
       <div className="space-y-2">

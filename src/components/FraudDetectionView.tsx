@@ -21,7 +21,7 @@ export default function FraudDetectionView() {
   const fakeOrSuspicious = docs.filter(d => d.status === "fake" || d.status === "suspicious");
   const fakeCount = docs.filter(d => d.status === "fake").length;
   const suspiciousCount = docs.filter(d => d.status === "suspicious").length;
-  const avgRiskFlagged = fakeOrSuspicious.length ? Math.round(fakeOrSuspicious.reduce((s, d) => s + d.riskScore, 0) / fakeOrSuspicious.length) : 0;
+  const avgRiskFlagged = fakeOrSuspicious.length ? Math.round(fakeOrSuspicious.reduce((s: number, d: any) => s + (d.riskScore as number), 0) / fakeOrSuspicious.length) : 0;
 
   // Pattern detection: group by case type
   const typePatterns = fakeOrSuspicious.reduce((acc, d) => {
