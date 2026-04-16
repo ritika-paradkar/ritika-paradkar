@@ -285,8 +285,10 @@ export default function DashboardView() {
         <p className="text-muted-foreground text-sm mt-1">AI-powered overview of all cases, risk analysis, and document verification. Documents analyzed by AI appear with an <span className="text-primary font-semibold">AI</span> badge.</p>
       </div>
 
+      <DashboardFiltersBar filters={filters} onChange={setFilters} caseTypes={caseTypes} />
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard icon={FileText} label="Total Cases" value={String(allDocs.length)} color="bg-primary/10 text-primary" />
+        <StatCard icon={FileText} label="Total Cases" value={String(filtered.length)} color="bg-primary/10 text-primary" />
         <StatCard icon={Shield} label="Verified" value={String(realCount)} color="bg-status-real/10 text-status-real" />
         <StatCard icon={AlertTriangle} label="Suspicious" value={String(suspiciousCount)} color="bg-status-suspicious/10 text-status-suspicious" />
         <StatCard icon={XCircle} label="Fake Detected" value={String(fakeCount)} color="bg-status-fake/10 text-status-fake" />
@@ -308,11 +310,8 @@ export default function DashboardView() {
               </tr>
             </thead>
             <tbody>
-              {dbDocs.map((doc) => (
-                <DocumentRow key={`db-${doc.id}`} doc={doc} onClick={() => setSelected(doc)} isDb />
-              ))}
-              {mockDocuments.map((doc) => (
-                <DocumentRow key={doc.id} doc={doc} onClick={() => setSelected(doc)} />
+              {filtered.map((doc) => (
+                <DocumentRow key={doc.id} doc={doc} onClick={() => setSelected(doc)} isDb={dbDocs.some(d => d.id === doc.id)} />
               ))}
             </tbody>
           </table>
