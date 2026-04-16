@@ -1,11 +1,13 @@
 import { useState, useCallback } from "react";
 import { Upload, FileText, Image, Video, CheckCircle, AlertTriangle, XCircle, Loader2, ShieldCheck, Bot, Volume2, VolumeX, Languages } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getVerificationResult, getMockAnalysis, type VerificationStatus } from "@/lib/mockData";
+import { type VerificationStatus } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import RiskScoreGauge from "@/components/RiskScoreGauge";
 import CaseTimeline from "@/components/CaseTimeline";
 import AlertPanel from "@/components/AlertPanel";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const statusConfig: Record<VerificationStatus, { icon: typeof CheckCircle; label: string; class: string }> = {
   real: { icon: CheckCircle, label: "Authentic Document", class: "status-real" },
@@ -37,46 +39,53 @@ function isLikelyLegalDocument(file: File): { isLegal: boolean; reason: string }
   const name = file.name.toLowerCase();
   const ext = name.split(".").pop() || "";
 
-  // PDFs are very likely legal documents
-  if (ext === "pdf") {
-    return { isLegal: true, reason: "PDF document detected" };
-  }
+  if (ext === "pdf") return { isLegal: true, reason: "PDF document detected" };
 
-  // Check filename for legal keywords
   const hasLegalKeyword = LEGAL_KEYWORDS.some((kw) => name.includes(kw));
-  if (hasLegalKeyword) {
-    return { isLegal: true, reason: "Legal document keyword found in filename" };
-  }
+  if (hasLegalKeyword) return { isLegal: true, reason: "Legal document keyword found in filename" };
 
-  // Videos — only legal if name suggests evidence/exhibit
   if (["mp4", "avi", "mov", "mkv", "webm"].includes(ext)) {
     const evidenceKeywords = ["evidence", "exhibit", "cctv", "footage", "recording", "testimony", "deposition", "surveillance"];
     const isEvidence = evidenceKeywords.some((kw) => name.includes(kw));
     if (isEvidence) return { isLegal: true, reason: "Video evidence detected" };
-    return { isLegal: false, reason: "This video does not appear to be legal evidence. Please rename it to include a descriptor like 'evidence', 'exhibit', or 'cctv', or upload an actual legal document." };
+    return { isLegal: false, reason: "This video does not appear to be legal evidence. Please rename it to include a descriptor like 'evidence', 'exhibit', or 'cctv'." };
   }
 
-  // Images — only legal if name suggests a scanned doc or evidence
   if (["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext)) {
     const scanKeywords = ["scan", "document", "evidence", "exhibit", "receipt", "invoice", "contract", "agreement", "id", "license", "certificate", "notarized", "court", "signed"];
     const isScan = scanKeywords.some((kw) => name.includes(kw));
     if (isScan) return { isLegal: true, reason: "Scanned legal document detected" };
-    return { isLegal: false, reason: "This image does not appear to be a legal document. If it's a scanned document, please rename it to include a descriptor like 'scan', 'document', 'evidence', or 'contract'." };
+    return { isLegal: false, reason: "This image does not appear to be a legal document. Please rename it to include 'scan', 'document', 'evidence', or 'contract'." };
   }
 
   return { isLegal: true, reason: "Document accepted for analysis" };
+}
+
+interface AnalysisResult {
+  status: VerificationStatus;
+  confidence: number;
+  riskScore: number;
+  caseType: string;
+  clauses: string[];
+  risks: string[];
+  timeline: { date: string; event: string; status: "completed" | "current" | "upcoming" }[];
+  alerts: { type: "danger" | "warning" | "info"; message: string }[];
+  recommendation: {
+    priority: string;
+    lawyerType: string;
+    reasoning: string;
+    action: string;
+  };
+  precedents: { title: string; year: number; outcome: string; relevance: number; summary: string }[];
+  similarCases: { case_type: string; summary: string; outcome: string }[];
+  matchedClauseDetails: { clause_name: string; description: string; risk_level: string }[];
 }
 
 export default function UploadView() {
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [result, setResult] = useState<{
-    status: VerificationStatus;
-    confidence: number;
-    riskScore: number;
-    analysis: ReturnType<typeof getMockAnalysis>;
-  } | null>(null);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const [lang, setLang] = useState<"en" | "hi">("en");
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
@@ -103,19 +112,48 @@ export default function UploadView() {
     }
     setRejectionReason(null);
     setVerifying(true);
-    await new Promise((r) => setTimeout(r, 1500 + Math.random() * 1000));
-    const vr = getVerificationResult();
-    const analysis = getMockAnalysis();
-    setResult({ ...vr, analysis });
-    setVerifying(false);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-document", {
+        body: {
+          fileName: file.name,
+          fileType: getFileType(file.name),
+          fileSize: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+        },
+      });
+
+      if (error) throw error;
+
+      const doc = data.document;
+      setResult({
+        status: doc.status,
+        confidence: doc.confidence,
+        riskScore: doc.risk_score,
+        caseType: doc.case_type,
+        clauses: Array.isArray(doc.clauses) ? doc.clauses : [],
+        risks: Array.isArray(doc.risks) ? doc.risks : [],
+        timeline: Array.isArray(doc.timeline) ? doc.timeline : [],
+        alerts: Array.isArray(doc.alerts) ? doc.alerts : [],
+        recommendation: doc.recommendation || {},
+        precedents: Array.isArray(doc.precedents) ? doc.precedents : [],
+        similarCases: data.similarCases || [],
+        matchedClauseDetails: data.matchedClauses || [],
+      });
+      toast.success("Document analyzed successfully!");
+    } catch (err: any) {
+      console.error("Analysis error:", err);
+      toast.error(err.message || "Failed to analyze document. Please try again.");
+    } finally {
+      setVerifying(false);
+    }
   };
 
   const speakResult = () => {
     if (!result || !file) return;
     if (speaking) { window.speechSynthesis.cancel(); setSpeaking(false); return; }
 
-    const textEn = `Document ${file.name} has been analyzed. Verification result: ${result.status}. Risk score: ${result.riskScore} out of 100. ${result.analysis.risks.join(". ")}. Recommendation: ${result.analysis.recommendation.action}`;
-    const textHi = `दस्तावेज़ ${file.name} का विश्लेषण किया गया है। सत्यापन परिणाम: ${result.status === "real" ? "असली" : result.status === "suspicious" ? "संदिग्ध" : "नकली"}। जोखिम स्कोर: ${result.riskScore}। सिफारिश: ${result.analysis.recommendation.action}`;
+    const textEn = `Document ${file.name} has been analyzed. It is classified as a ${result.caseType} document. Verification result: ${result.status}. Risk score: ${result.riskScore} out of 100. ${result.risks.slice(0, 2).join(". ")}. Recommendation: ${result.recommendation.action}`;
+    const textHi = `दस्तावेज़ ${file.name} का विश्लेषण किया गया है। यह ${result.caseType} श्रेणी का है। सत्यापन परिणाम: ${result.status === "real" ? "असली" : result.status === "suspicious" ? "संदिग्ध" : "नकली"}। जोखिम स्कोर: ${result.riskScore}। सिफारिश: ${result.recommendation.action}`;
 
     const u = new SpeechSynthesisUtterance(lang === "en" ? textEn : textHi);
     u.lang = lang === "en" ? "en-US" : "hi-IN";
@@ -132,7 +170,7 @@ export default function UploadView() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Upload & Verify Document</h1>
-        <p className="text-muted-foreground text-sm mt-1">Drag & drop a document to verify authenticity, detect deepfakes, and analyze legal content.</p>
+        <p className="text-muted-foreground text-sm mt-1">Upload a document for AI-powered verification, clause extraction, risk analysis, and case matching.</p>
       </div>
 
       <div
@@ -142,10 +180,7 @@ export default function UploadView() {
         className={`glass-card glow-border p-12 flex flex-col items-center gap-4 cursor-pointer transition-all ${dragOver ? "border-primary/60 bg-primary/5 scale-[1.01]" : "hover:border-primary/30"}`}
         onClick={() => document.getElementById("file-input")?.click()}
       >
-        <motion.div
-          animate={dragOver ? { scale: 1.1, rotate: 5 } : { scale: 1, rotate: 0 }}
-          className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center"
-        >
+        <motion.div animate={dragOver ? { scale: 1.1, rotate: 5 } : { scale: 1, rotate: 0 }} className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
           <Upload className="w-7 h-7 text-primary" />
         </motion.div>
         <div className="text-center">
@@ -169,7 +204,7 @@ export default function UploadView() {
             </div>
             <Button onClick={handleVerify} disabled={verifying} className="gap-2">
               {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              {verifying ? "Analyzing..." : "Verify & Analyze"}
+              {verifying ? "AI Analyzing..." : "Verify & Analyze"}
             </Button>
           </motion.div>
         )}
@@ -177,9 +212,7 @@ export default function UploadView() {
 
       <AnimatePresence>
         {rejectionReason && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="glass-card p-5 border-status-fake/30 bg-status-fake/5"
-          >
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-5 border-status-fake/30 bg-status-fake/5">
             <div className="flex items-start gap-3">
               <XCircle className="w-5 h-5 text-status-fake mt-0.5 shrink-0" />
               <div>
@@ -212,23 +245,26 @@ export default function UploadView() {
               <div className="flex items-center gap-6">
                 <RiskScoreGauge score={result.riskScore} size="lg" />
                 <div className="flex-1 space-y-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-semibold ${statusConfig[result.status].class}`}>
                       {(() => { const SI = statusConfig[result.status].icon; return <SI className="w-4 h-4" />; })()}
                       {statusConfig[result.status].label}
                     </span>
                     {result.status === "real" && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold bg-status-real/15 text-status-real border border-status-real/30">
-                        <ShieldCheck className="w-3 h-3" />VERIFIED EVIDENCE
+                        <ShieldCheck className="w-3 h-3" />VERIFIED
                       </span>
                     )}
+                    <span className="text-xs text-muted-foreground bg-secondary/60 px-2.5 py-1 rounded-full">{result.caseType}</span>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${result.recommendation.priority === "high" ? "priority-high" : result.recommendation.priority === "medium" ? "priority-medium" : "priority-low"}`}>
+                      {result.recommendation.priority} priority
+                    </span>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Confidence Score</p>
                     <div className="flex items-center gap-3 mt-1">
                       <div className="flex-1 h-2 rounded-full bg-secondary overflow-hidden">
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${result.confidence}%` }}
-                          transition={{ duration: 0.8 }}
+                        <motion.div initial={{ width: 0 }} animate={{ width: `${result.confidence}%` }} transition={{ duration: 0.8 }}
                           className={`h-full rounded-full ${result.status === "real" ? "bg-status-real" : result.status === "suspicious" ? "bg-status-suspicious" : "bg-status-fake"}`}
                         />
                       </div>
@@ -240,12 +276,12 @@ export default function UploadView() {
             </div>
 
             {/* Alerts */}
-            {result.analysis.alerts.length > 0 && (
+            {result.alerts.length > 0 && (
               <div className="glass-card p-6">
                 <h2 className="font-heading text-lg font-semibold mb-3 flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-status-suspicious" />Auto Alerts
                 </h2>
-                <AlertPanel alerts={result.analysis.alerts} />
+                <AlertPanel alerts={result.alerts} />
               </div>
             )}
 
@@ -256,11 +292,31 @@ export default function UploadView() {
                 <h2 className="font-heading text-lg font-semibold">AI Recommendation</h2>
               </div>
               <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
-                <p className="text-sm text-foreground/90 mb-1">{result.analysis.recommendation.reasoning}</p>
-                <p className="text-sm font-medium text-primary">{result.analysis.recommendation.action}</p>
-                <p className="text-xs text-muted-foreground mt-1.5">Suggested: {result.analysis.recommendation.lawyerType} · Priority: <span className="capitalize font-medium">{result.analysis.recommendation.priority}</span></p>
+                <p className="text-sm text-foreground/90 mb-1">{result.recommendation.reasoning}</p>
+                <p className="text-sm font-medium text-primary">{result.recommendation.action}</p>
+                <p className="text-xs text-muted-foreground mt-1.5">Suggested: {result.recommendation.lawyerType} · Priority: <span className="capitalize font-medium">{result.recommendation.priority}</span></p>
               </div>
             </div>
+
+            {/* Matched Clauses from DB */}
+            {result.matchedClauseDetails.length > 0 && (
+              <div className="glass-card p-6">
+                <h2 className="font-heading text-lg font-semibold mb-3">📋 Matched Clauses (from Database)</h2>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {result.matchedClauseDetails.map((c, i) => (
+                    <div key={i} className="p-3 rounded-lg bg-secondary/40 border border-border/50">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-semibold">{c.clause_name}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${c.risk_level === "high" ? "priority-high" : c.risk_level === "medium" ? "priority-medium" : "priority-low"}`}>
+                          {c.risk_level} risk
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{c.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Analysis */}
             <div className="glass-card p-6">
@@ -269,7 +325,7 @@ export default function UploadView() {
                 <div>
                   <h3 className="text-sm font-semibold text-primary mb-2">Clauses Found</h3>
                   <ul className="space-y-2">
-                    {result.analysis.clauses.map((c, i) => (
+                    {result.clauses.map((c, i) => (
                       <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />{c}
                       </li>
@@ -279,7 +335,7 @@ export default function UploadView() {
                 <div>
                   <h3 className="text-sm font-semibold text-status-suspicious mb-2">Risk Factors</h3>
                   <ul className="space-y-2">
-                    {result.analysis.risks.map((r, i) => (
+                    {result.risks.map((r, i) => (
                       <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
                         <AlertTriangle className="w-3.5 h-3.5 text-status-suspicious mt-0.5 shrink-0" />{r}
                       </li>
@@ -288,10 +344,56 @@ export default function UploadView() {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-primary mb-2">Case Progress</h3>
-                  <CaseTimeline events={result.analysis.timeline} />
+                  <CaseTimeline events={result.timeline} />
                 </div>
               </div>
             </div>
+
+            {/* Precedents */}
+            {result.precedents.length > 0 && (
+              <div className="glass-card p-6">
+                <h2 className="font-heading text-lg font-semibold mb-3">📚 Similar Precedents</h2>
+                <div className="space-y-2">
+                  {result.precedents.map((p, i) => (
+                    <div key={i} className="p-3 rounded-lg bg-secondary/40 border border-border/50">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-semibold">{p.title} ({p.year})</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.outcome === "Guilty" ? "priority-high" : p.outcome === "Not Guilty" ? "priority-low" : "priority-medium"}`}>
+                          {p.outcome}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{p.summary}</p>
+                      <div className="flex items-center gap-1 mt-1.5">
+                        <div className="h-1 flex-1 rounded-full bg-secondary overflow-hidden">
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${p.relevance}%` }} />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{p.relevance}% match</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Similar Cases from DB */}
+            {result.similarCases.length > 0 && (
+              <div className="glass-card p-6">
+                <h2 className="font-heading text-lg font-semibold mb-3">🔍 Similar Cases (from Database)</h2>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {result.similarCases.map((c, i) => (
+                    <div key={i} className="p-3 rounded-lg bg-secondary/40 border border-border/50">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-semibold">{c.case_type}</p>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${c.outcome === "Guilty" ? "priority-high" : c.outcome === "Not Guilty" || c.outcome === "Dismissed" ? "priority-low" : "priority-medium"}`}>
+                          {c.outcome}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{c.summary}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
