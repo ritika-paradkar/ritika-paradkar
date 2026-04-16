@@ -22,6 +22,51 @@ function getFileType(name: string): "pdf" | "image" | "video" {
   return "pdf";
 }
 
+const LEGAL_KEYWORDS = [
+  "contract", "agreement", "affidavit", "deed", "notice", "legal", "court",
+  "petition", "complaint", "summons", "warrant", "judgment", "order", "lease",
+  "power of attorney", "will", "testament", "bond", "memorandum", "clause",
+  "disclosure", "settlement", "arbitration", "indemnity", "license", "nda",
+  "non-disclosure", "terms", "policy", "compliance", "evidence", "exhibit",
+  "declaration", "pleading", "motion", "brief", "statute", "regulation",
+  "invoice", "receipt", "statement", "report", "certificate", "document",
+  "case", "filing", "doc", "scan", "signed", "notarized", "certified",
+];
+
+function isLikelyLegalDocument(file: File): { isLegal: boolean; reason: string } {
+  const name = file.name.toLowerCase();
+  const ext = name.split(".").pop() || "";
+
+  // PDFs are very likely legal documents
+  if (ext === "pdf") {
+    return { isLegal: true, reason: "PDF document detected" };
+  }
+
+  // Check filename for legal keywords
+  const hasLegalKeyword = LEGAL_KEYWORDS.some((kw) => name.includes(kw));
+  if (hasLegalKeyword) {
+    return { isLegal: true, reason: "Legal document keyword found in filename" };
+  }
+
+  // Videos — only legal if name suggests evidence/exhibit
+  if (["mp4", "avi", "mov", "mkv", "webm"].includes(ext)) {
+    const evidenceKeywords = ["evidence", "exhibit", "cctv", "footage", "recording", "testimony", "deposition", "surveillance"];
+    const isEvidence = evidenceKeywords.some((kw) => name.includes(kw));
+    if (isEvidence) return { isLegal: true, reason: "Video evidence detected" };
+    return { isLegal: false, reason: "This video does not appear to be legal evidence. Please rename it to include a descriptor like 'evidence', 'exhibit', or 'cctv', or upload an actual legal document." };
+  }
+
+  // Images — only legal if name suggests a scanned doc or evidence
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp"].includes(ext)) {
+    const scanKeywords = ["scan", "document", "evidence", "exhibit", "receipt", "invoice", "contract", "agreement", "id", "license", "certificate", "notarized", "court", "signed"];
+    const isScan = scanKeywords.some((kw) => name.includes(kw));
+    if (isScan) return { isLegal: true, reason: "Scanned legal document detected" };
+    return { isLegal: false, reason: "This image does not appear to be a legal document. If it's a scanned document, please rename it to include a descriptor like 'scan', 'document', 'evidence', or 'contract'." };
+  }
+
+  return { isLegal: true, reason: "Document accepted for analysis" };
+}
+
 export default function UploadView() {
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -34,20 +79,29 @@ export default function UploadView() {
   } | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const [lang, setLang] = useState<"en" | "hi">("en");
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const f = e.dataTransfer.files[0];
-    if (f) { setFile(f); setResult(null); }
+    if (f) { setFile(f); setResult(null); setRejectionReason(null); }
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) { setFile(f); setResult(null); }
+    if (f) { setFile(f); setResult(null); setRejectionReason(null); }
   };
 
   const handleVerify = async () => {
+    if (!file) return;
+    const check = isLikelyLegalDocument(file);
+    if (!check.isLegal) {
+      setRejectionReason(check.reason);
+      setResult(null);
+      return;
+    }
+    setRejectionReason(null);
     setVerifying(true);
     await new Promise((r) => setTimeout(r, 1500 + Math.random() * 1000));
     const vr = getVerificationResult();
@@ -117,6 +171,22 @@ export default function UploadView() {
               {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
               {verifying ? "Analyzing..." : "Verify & Analyze"}
             </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {rejectionReason && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="glass-card p-5 border-status-fake/30 bg-status-fake/5"
+          >
+            <div className="flex items-start gap-3">
+              <XCircle className="w-5 h-5 text-status-fake mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-status-fake">Not a Legal Document</p>
+                <p className="text-sm text-muted-foreground mt-1">{rejectionReason}</p>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
