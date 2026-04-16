@@ -15,6 +15,7 @@ import VersionHistoryView from "@/components/VersionHistoryView";
 import DeadlineView from "@/components/DeadlineView";
 import SmartTagsView from "@/components/SmartTagsView";
 import CaseSummaryView from "@/components/CaseSummaryView";
+import SettingsView from "@/components/SettingsView";
 
 export default function Index() {
   const [activeView, setActiveView] = useState("dashboard");
@@ -38,6 +39,7 @@ export default function Index() {
         {activeView === "deadlines" && <DeadlineView />}
         {activeView === "tags" && <SmartTagsView />}
         {activeView === "summary" && <CaseSummaryView />}
+        {activeView === "settings" && <SettingsView />}
       </main>
     </div>
   );
