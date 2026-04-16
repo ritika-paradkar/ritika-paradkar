@@ -33,7 +33,7 @@ export default function FraudDetectionView() {
   // Common risk patterns
   const allRisks = fakeOrSuspicious.flatMap(d => Array.isArray(d.risks) ? d.risks : []);
   const riskFreq = allRisks.reduce((acc, r) => { const k = typeof r === "string" ? r : ""; if (k) acc[k] = (acc[k] || 0) + 1; return acc; }, {} as Record<string, number>);
-  const topRisks = Object.entries(riskFreq).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const topRisks: [string, number][] = Object.entries(riskFreq).sort((a, b) => (b[1] as number) - (a[1] as number)).slice(0, 8) as [string, number][];
 
   return (
     <div className="space-y-6">
