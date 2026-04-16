@@ -1,4 +1,4 @@
-import { Scale, LayoutDashboard, Upload, FolderSearch, Users, Database, MessageSquare, GitCompare, Wand2, Map, ShieldAlert, History, Clock, Tag, FileBarChart, Globe } from "lucide-react";
+import { Scale, LayoutDashboard, Upload, FolderSearch, Users, Database, MessageSquare, GitCompare, Wand2, Map, ShieldAlert, History, Clock, Tag, FileBarChart, Globe, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -41,6 +41,7 @@ const navSections = [
       { id: "deadlines", label: "Deadlines", icon: Clock },
       { id: "versions", label: "Version History", icon: History },
       { id: "public", label: "Public Mode", icon: Globe },
+      { id: "settings", label: "Settings", icon: Settings },
     ],
   },
 ];
