@@ -176,6 +176,22 @@ export default function UploadView() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {rejectionReason && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="glass-card p-5 border-status-fake/30 bg-status-fake/5"
+          >
+            <div className="flex items-start gap-3">
+              <XCircle className="w-5 h-5 text-status-fake mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-status-fake">Not a Legal Document</p>
+                <p className="text-sm text-muted-foreground mt-1">{rejectionReason}</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {result && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             {/* Verification + Risk Score */}
