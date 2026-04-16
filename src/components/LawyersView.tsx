@@ -1,7 +1,8 @@
 import { mockLawyers, mockDocuments, type Lawyer } from "@/lib/mockData";
-import { Users, Star, Briefcase, Mail, Calendar } from "lucide-react";
+import { Users, Star, Briefcase, Mail, Calendar, Sparkles, CheckCircle } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const availColors: Record<Lawyer["availability"], string> = {
   available: "bg-status-real text-status-real",
@@ -15,19 +16,87 @@ const availBg: Record<Lawyer["availability"], string> = {
   unavailable: "status-fake",
 };
 
+function getRecommendedLawyer(caseType: string): Lawyer | null {
+  const specMap: Record<string, string> = {
+    "Employment Law": "Employment Law",
+    "Real Estate": "Real Estate",
+    "Criminal Defense": "Criminal Defense",
+    "Contract Dispute": "Contract Dispute",
+    "Intellectual Property": "Intellectual Property",
+    "Immigration": "Immigration",
+    "Fraud": "Criminal Defense",
+  };
+
+  const spec = specMap[caseType] || caseType;
+  const available = mockLawyers
+    .filter(l => l.availability !== "unavailable" && l.specialization === spec)
+    .sort((a, b) => b.rating - a.rating);
+  
+  if (available.length > 0) return available[0];
+  
+  // Fallback: any available lawyer sorted by rating
+  return mockLawyers
+    .filter(l => l.availability !== "unavailable")
+    .sort((a, b) => b.rating - a.rating)[0] || null;
+}
+
 export default function LawyersView() {
   const [selected, setSelected] = useState<Lawyer | null>(null);
+  const [recentDocs, setRecentDocs] = useState<any[]>([]);
+  const [showRecommendation, setShowRecommendation] = useState(false);
+
+  useEffect(() => {
+    supabase.from("documents").select("id, file_name, case_type, risk_score, priority")
+      .order("created_at", { ascending: false }).limit(5)
+      .then(({ data }) => { if (data) setRecentDocs(data); });
+  }, []);
 
   const assignedDocs = selected
     ? mockDocuments.filter((d) => d.assignedLawyer === selected.id)
     : [];
 
+  // Get recommendations for recent docs
+  const recommendations = recentDocs.map(d => ({
+    doc: d,
+    lawyer: getRecommendedLawyer(d.case_type || "General"),
+  }));
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Lawyer Directory</h1>
-        <p className="text-muted-foreground text-sm mt-1">Manage lawyers and case assignments by severity and specialization.</p>
+        <h1 className="font-heading text-2xl font-bold">Lawyer Directory & Recommendations</h1>
+        <p className="text-muted-foreground text-sm mt-1">AI recommends the best lawyer for each case based on specialization, experience, and availability.</p>
       </div>
+
+      {/* AI Recommendation Engine */}
+      {recommendations.length > 0 && (
+        <div className="glass-card p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" />AI Lawyer Recommendations</h3>
+            <button onClick={() => setShowRecommendation(!showRecommendation)} className="text-xs text-primary hover:underline">
+              {showRecommendation ? "Hide" : "Show"} recommendations
+            </button>
+          </div>
+          {showRecommendation && (
+            <div className="space-y-2">
+              {recommendations.map((r, i) => r.lawyer && (
+                <motion.div key={i} initial={{ opacity: 0, x: -5 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+                  className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">{r.lawyer.avatar}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold">{r.doc.file_name}</p>
+                    <p className="text-[10px] text-muted-foreground">{r.doc.case_type} · Risk: {r.doc.risk_score}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-semibold text-primary flex items-center gap-1"><CheckCircle className="w-3 h-3" />{r.lawyer.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{r.lawyer.specialization} · ⭐ {r.lawyer.rating}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-6" style={{ gridTemplateColumns: selected ? "1fr 1fr" : "1fr" }}>
         <div className="grid gap-4 sm:grid-cols-2">
