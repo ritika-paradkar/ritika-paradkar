@@ -6,6 +6,7 @@ import RiskScoreGauge from "@/components/RiskScoreGauge";
 import CaseTimeline from "@/components/CaseTimeline";
 import AlertPanel from "@/components/AlertPanel";
 import { supabase } from "@/integrations/supabase/client";
+import DashboardFiltersBar, { type DashboardFilters } from "@/components/DashboardFilters";
 
 const statusConfig: Record<VerificationStatus, { icon: typeof CheckCircle; label: string; class: string }> = {
   real: { icon: CheckCircle, label: "Real", class: "status-real" },
@@ -234,6 +235,9 @@ function DocumentDetail({ doc, onClose }: { doc: LegalDocument; onClose: () => v
 export default function DashboardView() {
   const [selected, setSelected] = useState<LegalDocument | null>(null);
   const [dbDocs, setDbDocs] = useState<LegalDocument[]>([]);
+  const [filters, setFilters] = useState<DashboardFilters>({
+    search: "", status: "all", priority: "all", caseType: "", riskRange: [0, 100],
+  });
 
   useEffect(() => {
     const fetchDocs = async () => {
@@ -254,11 +258,25 @@ export default function DashboardView() {
 
   const allDocs = [...dbDocs, ...mockDocuments];
 
-  const realCount = allDocs.filter((d) => d.status === "real").length;
-  const suspiciousCount = allDocs.filter((d) => d.status === "suspicious").length;
-  const fakeCount = allDocs.filter((d) => d.status === "fake").length;
-  const highRiskCount = allDocs.filter((d) => d.riskScore >= 70).length;
-  const avgRisk = allDocs.length ? Math.round(allDocs.reduce((s, d) => s + d.riskScore, 0) / allDocs.length) : 0;
+  const caseTypes = [...new Set(allDocs.map((d) => d.caseType).filter(Boolean))];
+
+  const filtered = allDocs.filter((d) => {
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      if (!d.name.toLowerCase().includes(q) && !d.caseType.toLowerCase().includes(q)) return false;
+    }
+    if (filters.status !== "all" && d.status !== filters.status) return false;
+    if (filters.priority !== "all" && d.priority !== filters.priority) return false;
+    if (filters.caseType && d.caseType !== filters.caseType) return false;
+    if (d.riskScore < filters.riskRange[0] || d.riskScore > filters.riskRange[1]) return false;
+    return true;
+  });
+
+  const realCount = filtered.filter((d) => d.status === "real").length;
+  const suspiciousCount = filtered.filter((d) => d.status === "suspicious").length;
+  const fakeCount = filtered.filter((d) => d.status === "fake").length;
+  const highRiskCount = filtered.filter((d) => d.riskScore >= 70).length;
+  const avgRisk = filtered.length ? Math.round(filtered.reduce((s, d) => s + d.riskScore, 0) / filtered.length) : 0;
 
   return (
     <div className="space-y-6">
