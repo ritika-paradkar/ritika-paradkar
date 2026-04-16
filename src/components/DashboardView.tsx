@@ -6,6 +6,7 @@ import RiskScoreGauge from "@/components/RiskScoreGauge";
 import CaseTimeline from "@/components/CaseTimeline";
 import AlertPanel from "@/components/AlertPanel";
 import { supabase } from "@/integrations/supabase/client";
+import DashboardFiltersBar, { type DashboardFilters } from "@/components/DashboardFilters";
 
 const statusConfig: Record<VerificationStatus, { icon: typeof CheckCircle; label: string; class: string }> = {
   real: { icon: CheckCircle, label: "Real", class: "status-real" },
@@ -234,6 +235,9 @@ function DocumentDetail({ doc, onClose }: { doc: LegalDocument; onClose: () => v
 export default function DashboardView() {
   const [selected, setSelected] = useState<LegalDocument | null>(null);
   const [dbDocs, setDbDocs] = useState<LegalDocument[]>([]);
+  const [filters, setFilters] = useState<DashboardFilters>({
+    search: "", status: "all", priority: "all", caseType: "", riskRange: [0, 100],
+  });
 
   useEffect(() => {
     const fetchDocs = async () => {
@@ -254,11 +258,25 @@ export default function DashboardView() {
 
   const allDocs = [...dbDocs, ...mockDocuments];
 
-  const realCount = allDocs.filter((d) => d.status === "real").length;
-  const suspiciousCount = allDocs.filter((d) => d.status === "suspicious").length;
-  const fakeCount = allDocs.filter((d) => d.status === "fake").length;
-  const highRiskCount = allDocs.filter((d) => d.riskScore >= 70).length;
-  const avgRisk = allDocs.length ? Math.round(allDocs.reduce((s, d) => s + d.riskScore, 0) / allDocs.length) : 0;
+  const caseTypes = [...new Set(allDocs.map((d) => d.caseType).filter(Boolean))];
+
+  const filtered = allDocs.filter((d) => {
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      if (!d.name.toLowerCase().includes(q) && !d.caseType.toLowerCase().includes(q)) return false;
+    }
+    if (filters.status !== "all" && d.status !== filters.status) return false;
+    if (filters.priority !== "all" && d.priority !== filters.priority) return false;
+    if (filters.caseType && d.caseType !== filters.caseType) return false;
+    if (d.riskScore < filters.riskRange[0] || d.riskScore > filters.riskRange[1]) return false;
+    return true;
+  });
+
+  const realCount = filtered.filter((d) => d.status === "real").length;
+  const suspiciousCount = filtered.filter((d) => d.status === "suspicious").length;
+  const fakeCount = filtered.filter((d) => d.status === "fake").length;
+  const highRiskCount = filtered.filter((d) => d.riskScore >= 70).length;
+  const avgRisk = filtered.length ? Math.round(filtered.reduce((s, d) => s + d.riskScore, 0) / filtered.length) : 0;
 
   return (
     <div className="space-y-6">
@@ -267,8 +285,10 @@ export default function DashboardView() {
         <p className="text-muted-foreground text-sm mt-1">AI-powered overview of all cases, risk analysis, and document verification. Documents analyzed by AI appear with an <span className="text-primary font-semibold">AI</span> badge.</p>
       </div>
 
+      <DashboardFiltersBar filters={filters} onChange={setFilters} caseTypes={caseTypes} />
+
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard icon={FileText} label="Total Cases" value={String(allDocs.length)} color="bg-primary/10 text-primary" />
+        <StatCard icon={FileText} label="Total Cases" value={String(filtered.length)} color="bg-primary/10 text-primary" />
         <StatCard icon={Shield} label="Verified" value={String(realCount)} color="bg-status-real/10 text-status-real" />
         <StatCard icon={AlertTriangle} label="Suspicious" value={String(suspiciousCount)} color="bg-status-suspicious/10 text-status-suspicious" />
         <StatCard icon={XCircle} label="Fake Detected" value={String(fakeCount)} color="bg-status-fake/10 text-status-fake" />
@@ -290,11 +310,8 @@ export default function DashboardView() {
               </tr>
             </thead>
             <tbody>
-              {dbDocs.map((doc) => (
-                <DocumentRow key={`db-${doc.id}`} doc={doc} onClick={() => setSelected(doc)} isDb />
-              ))}
-              {mockDocuments.map((doc) => (
-                <DocumentRow key={doc.id} doc={doc} onClick={() => setSelected(doc)} />
+              {filtered.map((doc) => (
+                <DocumentRow key={doc.id} doc={doc} onClick={() => setSelected(doc)} isDb={dbDocs.some(d => d.id === doc.id)} />
               ))}
             </tbody>
           </table>
