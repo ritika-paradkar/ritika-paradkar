@@ -14,7 +14,144 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cases: {
+        Row: {
+          case_type: string
+          created_at: string
+          id: string
+          outcome: string
+          summary: string
+        }
+        Insert: {
+          case_type: string
+          created_at?: string
+          id?: string
+          outcome: string
+          summary: string
+        }
+        Update: {
+          case_type?: string
+          created_at?: string
+          id?: string
+          outcome?: string
+          summary?: string
+        }
+        Relationships: []
+      }
+      clauses: {
+        Row: {
+          clause_name: string
+          created_at: string
+          description: string
+          id: string
+          risk_level: Database["public"]["Enums"]["risk_level"]
+        }
+        Insert: {
+          clause_name: string
+          created_at?: string
+          description: string
+          id?: string
+          risk_level: Database["public"]["Enums"]["risk_level"]
+        }
+        Update: {
+          clause_name?: string
+          created_at?: string
+          description?: string
+          id?: string
+          risk_level?: Database["public"]["Enums"]["risk_level"]
+        }
+        Relationships: []
+      }
+      documents: {
+        Row: {
+          alerts: Json | null
+          case_type: string | null
+          clauses: Json | null
+          confidence: number
+          created_at: string
+          file_name: string
+          file_size: string | null
+          file_type: string
+          file_url: string | null
+          id: string
+          precedents: Json | null
+          priority: Database["public"]["Enums"]["risk_level"]
+          recommendation: Json | null
+          risk_level: Database["public"]["Enums"]["risk_level"]
+          risk_score: number
+          risks: Json | null
+          similar_case_ids: string[] | null
+          status: Database["public"]["Enums"]["verification_status"]
+          timeline: Json | null
+          updated_at: string
+        }
+        Insert: {
+          alerts?: Json | null
+          case_type?: string | null
+          clauses?: Json | null
+          confidence?: number
+          created_at?: string
+          file_name: string
+          file_size?: string | null
+          file_type?: string
+          file_url?: string | null
+          id?: string
+          precedents?: Json | null
+          priority?: Database["public"]["Enums"]["risk_level"]
+          recommendation?: Json | null
+          risk_level?: Database["public"]["Enums"]["risk_level"]
+          risk_score?: number
+          risks?: Json | null
+          similar_case_ids?: string[] | null
+          status?: Database["public"]["Enums"]["verification_status"]
+          timeline?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          alerts?: Json | null
+          case_type?: string | null
+          clauses?: Json | null
+          confidence?: number
+          created_at?: string
+          file_name?: string
+          file_size?: string | null
+          file_type?: string
+          file_url?: string | null
+          id?: string
+          precedents?: Json | null
+          priority?: Database["public"]["Enums"]["risk_level"]
+          recommendation?: Json | null
+          risk_level?: Database["public"]["Enums"]["risk_level"]
+          risk_score?: number
+          risks?: Json | null
+          similar_case_ids?: string[] | null
+          status?: Database["public"]["Enums"]["verification_status"]
+          timeline?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +160,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      risk_level: "high" | "medium" | "low"
+      verification_status: "real" | "suspicious" | "fake"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +288,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      risk_level: ["high", "medium", "low"],
+      verification_status: ["real", "suspicious", "fake"],
+    },
   },
 } as const
