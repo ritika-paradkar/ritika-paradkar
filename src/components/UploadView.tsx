@@ -246,19 +246,22 @@ export default function UploadView() {
                 <RiskScoreGauge score={result.riskScore} size="lg" />
                 <div className="flex-1 space-y-3">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-semibold ${statusConfig[result.status].class}`}>
-                      {(() => { const SI = statusConfig[result.status].icon; return <SI className="w-4 h-4" />; })()}
-                      {statusConfig[result.status].label}
-                    </span>
-                    {result.status === "real" && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold bg-status-real/15 text-status-real border border-status-real/30">
-                        <ShieldCheck className="w-3 h-3" />VERIFIED
-                      </span>
-                    )}
-                    <span className="text-xs text-muted-foreground bg-secondary/60 px-2.5 py-1 rounded-full">{result.caseType}</span>
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${result.recommendation.priority === "high" ? "priority-high" : result.recommendation.priority === "medium" ? "priority-medium" : "priority-low"}`}>
-                      {result.recommendation.priority} priority
-                    </span>
+                     <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-semibold ${statusConfig[result.status].class}`}>
+                       {(() => { const SI = statusConfig[result.status].icon; return <SI className="w-4 h-4" />; })()}
+                       {statusConfig[result.status].label}
+                     </span>
+                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold ${result.status === "real" ? "bg-status-real/15 text-status-real border border-status-real/30" : result.status === "suspicious" ? "bg-status-suspicious/15 text-status-suspicious border border-status-suspicious/30" : "bg-status-fake/15 text-status-fake border border-status-fake/30"}`}>
+                       🧠 {result.confidence}% {result.status === "real" ? "Real" : result.status === "suspicious" ? "Suspicious" : "Fake"}
+                     </span>
+                     {result.status === "real" && (
+                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-bold bg-status-real/15 text-status-real border border-status-real/30">
+                         <ShieldCheck className="w-3 h-3" />VERIFIED
+                       </span>
+                     )}
+                     <span className="text-xs text-muted-foreground bg-secondary/60 px-2.5 py-1 rounded-full">{result.caseType}</span>
+                     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${result.recommendation.priority === "high" ? "priority-high" : result.recommendation.priority === "medium" ? "priority-medium" : "priority-low"}`}>
+                       {result.recommendation.priority} priority
+                     </span>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Confidence Score</p>
