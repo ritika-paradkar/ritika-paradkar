@@ -24,11 +24,11 @@ export default function FraudDetectionView() {
   const avgRiskFlagged = fakeOrSuspicious.length ? Math.round(fakeOrSuspicious.reduce((s: number, d: any) => s + (d.riskScore as number), 0) / fakeOrSuspicious.length) : 0;
 
   // Pattern detection: group by case type
-  const typePatterns = fakeOrSuspicious.reduce((acc, d) => {
+  const typePatterns: Record<string, number> = {};
+  fakeOrSuspicious.forEach(d => {
     const ct = d.caseType || "Unknown";
-    acc[ct] = (acc[ct] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+    typePatterns[ct] = (typePatterns[ct] || 0) + 1;
+  });
 
   // Common risk patterns
   const allRisks = fakeOrSuspicious.flatMap(d => Array.isArray(d.risks) ? d.risks : []);
