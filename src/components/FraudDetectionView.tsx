@@ -65,11 +65,11 @@ export default function FraudDetectionView() {
         <div className="glass-card p-5">
           <h3 className="text-sm font-semibold mb-3 flex items-center gap-2"><TrendingUp className="w-3.5 h-3.5 text-status-fake" />Fraud by Category</h3>
           <div className="space-y-2">
-            {Object.entries(typePatterns).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
+            {(Object.entries(typePatterns) as [string, number][]).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
               <div key={type} className="flex items-center gap-3">
                 <p className="text-xs flex-1">{type}</p>
                 <div className="w-32 h-2 rounded-full bg-secondary overflow-hidden">
-                  <motion.div initial={{ width: 0 }} animate={{ width: `${(count / Math.max(...Object.values(typePatterns))) * 100}%` }}
+                  <motion.div initial={{ width: 0 }} animate={{ width: `${(count / Math.max(...(Object.values(typePatterns) as number[]))) * 100}%` }}
                     className="h-full rounded-full bg-status-fake" />
                 </div>
                 <span className="text-xs font-bold w-6 text-right">{count}</span>
