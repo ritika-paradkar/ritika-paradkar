@@ -62,6 +62,44 @@ export type Database = {
         }
         Relationships: []
       }
+      document_versions: {
+        Row: {
+          changes_summary: string | null
+          created_at: string
+          document_id: string
+          file_name: string
+          file_url: string | null
+          id: string
+          version_number: number
+        }
+        Insert: {
+          changes_summary?: string | null
+          created_at?: string
+          document_id: string
+          file_name: string
+          file_url?: string | null
+          id?: string
+          version_number?: number
+        }
+        Update: {
+          changes_summary?: string | null
+          created_at?: string
+          document_id?: string
+          file_name?: string
+          file_url?: string | null
+          id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_versions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           alerts: Json | null
@@ -69,6 +107,7 @@ export type Database = {
           clauses: Json | null
           confidence: number
           created_at: string
+          deadlines: Json | null
           file_name: string
           file_size: string | null
           file_type: string
@@ -82,6 +121,8 @@ export type Database = {
           risks: Json | null
           similar_case_ids: string[] | null
           status: Database["public"]["Enums"]["verification_status"]
+          summary: string | null
+          tags: string[] | null
           timeline: Json | null
           updated_at: string
         }
@@ -91,6 +132,7 @@ export type Database = {
           clauses?: Json | null
           confidence?: number
           created_at?: string
+          deadlines?: Json | null
           file_name: string
           file_size?: string | null
           file_type?: string
@@ -104,6 +146,8 @@ export type Database = {
           risks?: Json | null
           similar_case_ids?: string[] | null
           status?: Database["public"]["Enums"]["verification_status"]
+          summary?: string | null
+          tags?: string[] | null
           timeline?: Json | null
           updated_at?: string
         }
@@ -113,6 +157,7 @@ export type Database = {
           clauses?: Json | null
           confidence?: number
           created_at?: string
+          deadlines?: Json | null
           file_name?: string
           file_size?: string | null
           file_type?: string
@@ -126,6 +171,8 @@ export type Database = {
           risks?: Json | null
           similar_case_ids?: string[] | null
           status?: Database["public"]["Enums"]["verification_status"]
+          summary?: string | null
+          tags?: string[] | null
           timeline?: Json | null
           updated_at?: string
         }
