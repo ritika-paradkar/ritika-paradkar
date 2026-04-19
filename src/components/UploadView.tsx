@@ -8,6 +8,8 @@ import CaseTimeline from "@/components/CaseTimeline";
 import AlertPanel from "@/components/AlertPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { extractText } from "@/lib/extractText";
+import { useI18n } from "@/lib/i18n";
 
 const statusConfig: Record<VerificationStatus, { icon: typeof CheckCircle; label: string; class: string }> = {
   real: { icon: CheckCircle, label: "Authentic Document", class: "status-real" },
@@ -82,10 +84,13 @@ interface AnalysisResult {
 }
 
 export default function UploadView() {
+  const { lang: uiLang } = useI18n();
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [verifyStatus, setVerifyStatus] = useState<string>("");
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [textPreview, setTextPreview] = useState<string>("");
   const [speaking, setSpeaking] = useState(false);
   const [lang, setLang] = useState<"en" | "hi">("en");
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
@@ -94,12 +99,12 @@ export default function UploadView() {
     e.preventDefault();
     setDragOver(false);
     const f = e.dataTransfer.files[0];
-    if (f) { setFile(f); setResult(null); setRejectionReason(null); }
+    if (f) { setFile(f); setResult(null); setRejectionReason(null); setTextPreview(""); }
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) { setFile(f); setResult(null); setRejectionReason(null); }
+    if (f) { setFile(f); setResult(null); setRejectionReason(null); setTextPreview(""); }
   };
 
   const handleVerify = async () => {
@@ -112,17 +117,36 @@ export default function UploadView() {
     }
     setRejectionReason(null);
     setVerifying(true);
+    setVerifyStatus("Extracting text...");
 
     try {
+      // STEP 1-4: Extract → clean → validate
+      const ex = await extractText(file, (msg) => setVerifyStatus(msg));
+      console.log("[extract]", ex.kind, "len:", ex.cleanText.length, "readable:", ex.readable);
+      console.log("[extract preview]", ex.cleanText.slice(0, 500));
+      setTextPreview(ex.cleanText.slice(0, 800));
+
+      if (!ex.readable) {
+        setRejectionReason(ex.reason || "Document unreadable. Please upload a valid text-based document.");
+        setVerifying(false);
+        setVerifyStatus("");
+        return;
+      }
+
+      // STEP 5-6: Send clean text to AI
+      setVerifyStatus("AI analyzing...");
       const { data, error } = await supabase.functions.invoke("analyze-document", {
         body: {
           fileName: file.name,
           fileType: getFileType(file.name),
           fileSize: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+          extractedText: ex.cleanText,
+          language: uiLang,
         },
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       const doc = data.document;
       setResult({
@@ -142,9 +166,10 @@ export default function UploadView() {
       toast.success("Document analyzed successfully!");
     } catch (err: any) {
       console.error("Analysis error:", err);
-      toast.error(err.message || "Failed to analyze document. Please try again.");
+      toast.error(err.message || "Unable to analyze document. Please upload a clearer version.");
     } finally {
       setVerifying(false);
+      setVerifyStatus("");
     }
   };
 
@@ -185,9 +210,9 @@ export default function UploadView() {
         </motion.div>
         <div className="text-center">
           <p className="font-medium text-foreground">{dragOver ? "Drop it here!" : "Drag & drop your file here"}</p>
-          <p className="text-sm text-muted-foreground mt-1">Supports PDF, images, and video files · Max 50MB</p>
+          <p className="text-sm text-muted-foreground mt-1">Supports PDF, DOCX, images (OCR), and text files · Max 50MB</p>
         </div>
-        <input id="file-input" type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.mp4,.avi,.mov,.mkv" onChange={handleFileSelect} />
+        <input id="file-input" type="file" className="hidden" accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.webp" onChange={handleFileSelect} />
       </div>
 
       <AnimatePresence>
@@ -204,11 +229,18 @@ export default function UploadView() {
             </div>
             <Button onClick={handleVerify} disabled={verifying} className="gap-2">
               {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              {verifying ? "AI Analyzing..." : "Verify & Analyze"}
+              {verifying ? (verifyStatus || "Analyzing...") : "Verify & Analyze"}
             </Button>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {textPreview && (
+        <details className="glass-card p-4 text-xs">
+          <summary className="cursor-pointer font-medium text-muted-foreground">🔍 Extracted text preview (debug)</summary>
+          <pre className="mt-2 whitespace-pre-wrap text-muted-foreground/80 max-h-48 overflow-auto">{textPreview}</pre>
+        </details>
+      )}
 
       <AnimatePresence>
         {rejectionReason && (
