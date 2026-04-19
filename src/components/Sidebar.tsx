@@ -1,52 +1,47 @@
-import { Scale, LayoutDashboard, Upload, FolderSearch, Users, Database, MessageSquare, GitCompare, Wand2, Map, ShieldAlert, History, Clock, Tag, FileBarChart, Globe, Settings } from "lucide-react";
+import { Scale, LayoutDashboard, Upload, FolderSearch, Users, Database, MessageSquare, GitCompare, Wand2, Map, ShieldAlert, History, Clock, Tag, FileBarChart, Globe, Settings, LogIn, LogOut, User as UserIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth";
+import { useI18n } from "@/lib/i18n";
 
 interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
 }
 
-const navSections = [
-  {
-    label: "Core",
-    items: [
-      { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { id: "upload", label: "Upload & Verify", icon: Upload },
-      { id: "repository", label: "Repository", icon: Database },
-      { id: "similar", label: "Similar Cases", icon: FolderSearch },
-      { id: "lawyers", label: "Lawyers", icon: Users },
-    ],
-  },
-  {
-    label: "AI Tools",
-    items: [
-      { id: "chat", label: "Legal Assistant", icon: MessageSquare },
-      { id: "compare", label: "Clause Compare", icon: GitCompare },
-      { id: "simulator", label: "Risk Simulator", icon: Wand2 },
-      { id: "summary", label: "Case Summary", icon: FileBarChart },
-    ],
-  },
-  {
-    label: "Analytics",
-    items: [
-      { id: "heatmap", label: "Case Heatmap", icon: Map },
-      { id: "fraud", label: "Fraud Detection", icon: ShieldAlert },
-      { id: "tags", label: "Smart Tags", icon: Tag },
-    ],
-  },
-  {
-    label: "Management",
-    items: [
-      { id: "deadlines", label: "Deadlines", icon: Clock },
-      { id: "versions", label: "Version History", icon: History },
-      { id: "public", label: "Public Mode", icon: Globe },
-      { id: "settings", label: "Settings", icon: Settings },
-    ],
-  },
-];
-
 export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
+  const { user, signOut } = useAuth();
+  const { t } = useI18n();
+  const navigate = useNavigate();
+
+  const navSections = [
+    { label: t("section.core"), items: [
+      { id: "dashboard", label: t("nav.dashboard"), icon: LayoutDashboard },
+      { id: "upload", label: t("nav.upload"), icon: Upload },
+      { id: "repository", label: t("nav.repository"), icon: Database },
+      { id: "similar", label: t("nav.similar"), icon: FolderSearch },
+      { id: "lawyers", label: t("nav.lawyers"), icon: Users },
+    ]},
+    { label: t("section.ai"), items: [
+      { id: "chat", label: t("nav.chat"), icon: MessageSquare },
+      { id: "compare", label: t("nav.compare"), icon: GitCompare },
+      { id: "simulator", label: t("nav.simulator"), icon: Wand2 },
+      { id: "summary", label: t("nav.summary"), icon: FileBarChart },
+    ]},
+    { label: t("section.analytics"), items: [
+      { id: "heatmap", label: t("nav.heatmap"), icon: Map },
+      { id: "fraud", label: t("nav.fraud"), icon: ShieldAlert },
+      { id: "tags", label: t("nav.tags"), icon: Tag },
+    ]},
+    { label: t("section.management"), items: [
+      { id: "deadlines", label: t("nav.deadlines"), icon: Clock },
+      { id: "versions", label: t("nav.versions"), icon: History },
+      { id: "public", label: t("nav.public"), icon: Globe },
+      { id: "settings", label: t("nav.settings"), icon: Settings },
+    ]},
+  ];
+
   return (
     <aside className="w-64 h-screen fixed left-0 top-0 bg-card border-r border-border flex flex-col">
       <div className="p-6 flex items-center gap-3">
@@ -79,9 +74,30 @@ export default function Sidebar({ activeView, onViewChange }: SidebarProps) {
           </div>
         ))}
       </ScrollArea>
-      <div className="p-4 mx-3 mb-4 rounded-lg bg-secondary/50 border border-border">
-        <p className="text-xs text-muted-foreground">AI-Powered Legal Platform</p>
-        <p className="text-xs text-muted-foreground mt-1">13 features · Real-time analysis</p>
+      <div className="p-3 mx-3 mb-4 rounded-lg bg-secondary/50 border border-border space-y-2">
+        {user ? (
+          <>
+            <div className="flex items-center gap-2 px-1">
+              <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                <UserIcon className="w-3.5 h-3.5 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium truncate">{user.email}</p>
+                <p className="text-[10px] text-muted-foreground">Signed in</p>
+              </div>
+            </div>
+            <button onClick={signOut} className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium bg-secondary hover:bg-secondary/70 transition">
+              <LogOut className="w-3.5 h-3.5" />{t("auth.signout")}
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="text-xs text-muted-foreground px-1">{t("auth.guest")}</p>
+            <button onClick={() => navigate("/auth")} className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition">
+              <LogIn className="w-3.5 h-3.5" />{t("auth.signin")}
+            </button>
+          </>
+        )}
       </div>
     </aside>
   );
