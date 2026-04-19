@@ -210,9 +210,9 @@ export default function UploadView() {
         </motion.div>
         <div className="text-center">
           <p className="font-medium text-foreground">{dragOver ? "Drop it here!" : "Drag & drop your file here"}</p>
-          <p className="text-sm text-muted-foreground mt-1">Supports PDF, images, and video files · Max 50MB</p>
+          <p className="text-sm text-muted-foreground mt-1">Supports PDF, DOCX, images (OCR), and text files · Max 50MB</p>
         </div>
-        <input id="file-input" type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.mp4,.avi,.mov,.mkv" onChange={handleFileSelect} />
+        <input id="file-input" type="file" className="hidden" accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.webp" onChange={handleFileSelect} />
       </div>
 
       <AnimatePresence>
@@ -229,11 +229,18 @@ export default function UploadView() {
             </div>
             <Button onClick={handleVerify} disabled={verifying} className="gap-2">
               {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-              {verifying ? "AI Analyzing..." : "Verify & Analyze"}
+              {verifying ? (verifyStatus || "Analyzing...") : "Verify & Analyze"}
             </Button>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {textPreview && (
+        <details className="glass-card p-4 text-xs">
+          <summary className="cursor-pointer font-medium text-muted-foreground">🔍 Extracted text preview (debug)</summary>
+          <pre className="mt-2 whitespace-pre-wrap text-muted-foreground/80 max-h-48 overflow-auto">{textPreview}</pre>
+        </details>
+      )}
 
       <AnimatePresence>
         {rejectionReason && (
