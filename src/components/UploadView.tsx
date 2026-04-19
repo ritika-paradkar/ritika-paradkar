@@ -9,6 +9,7 @@ import AlertPanel from "@/components/AlertPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { extractText } from "@/lib/extractText";
+import { prepareMedia, detectMediaKind } from "@/lib/extractMedia";
 import { useI18n } from "@/lib/i18n";
 
 const statusConfig: Record<VerificationStatus, { icon: typeof CheckCircle; label: string; class: string }> = {
@@ -107,23 +108,67 @@ export default function UploadView() {
     if (f) { setFile(f); setResult(null); setRejectionReason(null); setTextPreview(""); }
   };
 
-  const handleVerify = async () => {
-    if (!file) return;
-    const check = isLikelyLegalDocument(file);
-    if (!check.isLegal) {
-      setRejectionReason(check.reason);
-      setResult(null);
-      return;
+  const handleVerify = async (overrideFile?: File) => {
+    const target = overrideFile || file;
+    if (!target) return;
+    const mediaKind = detectMediaKind(target);
+
+    // For images/videos, skip legal-keyword gate and route to deepfake analyzer
+    if (!mediaKind) {
+      const check = isLikelyLegalDocument(target);
+      if (!check.isLegal) {
+        setRejectionReason(check.reason);
+        setResult(null);
+        return;
+      }
     }
     setRejectionReason(null);
     setVerifying(true);
-    setVerifyStatus("Extracting text...");
 
     try {
-      // STEP 1-4: Extract → clean → validate
-      const ex = await extractText(file, (msg) => setVerifyStatus(msg));
+      if (mediaKind) {
+        // === IMAGE / VIDEO PIPELINE: deepfake & tampering detection ===
+        setVerifyStatus(mediaKind === "video" ? "Extracting frames..." : "Preparing image...");
+        const payload = await prepareMedia(target, (msg) => setVerifyStatus(msg));
+        console.log("[media]", payload.kind, "frames:", payload.frames.length, "meta:", payload.meta);
+        setTextPreview(`${payload.kind.toUpperCase()} • ${payload.frames.length} frame(s) • ${payload.meta.width}×${payload.meta.height}${payload.meta.durationSec ? ` • ${payload.meta.durationSec}s` : ""}`);
+
+        setVerifyStatus("AI analyzing frames...");
+        const { data, error } = await supabase.functions.invoke("analyze-media", {
+          body: {
+            fileName: target.name,
+            kind: payload.kind,
+            frames: payload.frames,
+            meta: payload.meta,
+            language: uiLang,
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        const doc = data.document;
+        setResult({
+          status: doc.status,
+          confidence: doc.confidence,
+          riskScore: doc.risk_score,
+          caseType: doc.case_type,
+          clauses: [],
+          risks: Array.isArray(doc.risks) ? doc.risks : [],
+          timeline: Array.isArray(doc.timeline) ? doc.timeline : [],
+          alerts: Array.isArray(doc.alerts) ? doc.alerts : [],
+          recommendation: doc.recommendation || {},
+          precedents: [],
+          similarCases: [],
+          matchedClauseDetails: [],
+        });
+        toast.success(`${mediaKind === "video" ? "Video" : "Image"} analyzed successfully!`);
+        return;
+      }
+
+      // === DOCUMENT PIPELINE (PDF / DOCX / scanned image OCR / text) ===
+      setVerifyStatus("Extracting text...");
+      const ex = await extractText(target, (msg) => setVerifyStatus(msg));
       console.log("[extract]", ex.kind, "len:", ex.cleanText.length, "readable:", ex.readable);
-      console.log("[extract preview]", ex.cleanText.slice(0, 500));
       setTextPreview(ex.cleanText.slice(0, 800));
 
       if (!ex.readable) {
@@ -133,13 +178,12 @@ export default function UploadView() {
         return;
       }
 
-      // STEP 5-6: Send clean text to AI
       setVerifyStatus("AI analyzing...");
       const { data, error } = await supabase.functions.invoke("analyze-document", {
         body: {
-          fileName: file.name,
-          fileType: getFileType(file.name),
-          fileSize: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+          fileName: target.name,
+          fileType: getFileType(target.name),
+          fileSize: `${(target.size / 1024 / 1024).toFixed(1)} MB`,
           extractedText: ex.cleanText,
           language: uiLang,
         },
@@ -166,7 +210,7 @@ export default function UploadView() {
       toast.success("Document analyzed successfully!");
     } catch (err: any) {
       console.error("Analysis error:", err);
-      toast.error(err.message || "Unable to analyze document. Please upload a clearer version.");
+      toast.error(err.message || "Unable to analyze file. Please upload a clearer version.");
     } finally {
       setVerifying(false);
       setVerifyStatus("");
@@ -212,7 +256,7 @@ export default function UploadView() {
           <p className="font-medium text-foreground">{dragOver ? "Drop it here!" : "Drag & drop your file here"}</p>
           <p className="text-sm text-muted-foreground mt-1">Supports PDF, DOCX, images (OCR), and text files · Max 50MB</p>
         </div>
-        <input id="file-input" type="file" className="hidden" accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.webp" onChange={handleFileSelect} />
+        <input id="file-input" type="file" className="hidden" accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.webp,.mp4,.mov,.avi,.mkv,.webm" onChange={handleFileSelect} />
       </div>
 
       <AnimatePresence>
@@ -227,7 +271,7 @@ export default function UploadView() {
                 <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(1)} MB · {fileType.toUpperCase()}</p>
               </div>
             </div>
-            <Button onClick={handleVerify} disabled={verifying} className="gap-2">
+            <Button onClick={() => handleVerify()} disabled={verifying} className="gap-2">
               {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
               {verifying ? (verifyStatus || "Analyzing...") : "Verify & Analyze"}
             </Button>
