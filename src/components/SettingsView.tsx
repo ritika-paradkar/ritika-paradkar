@@ -33,16 +33,20 @@ export default function SettingsView() {
   const { lang, setLang, t } = useI18n();
   const darkMode = theme === "dark";
 
-  const [notifications, setNotifications] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(NOTIF_KEY) || "") || null; } catch { return null; }
-    } || {
-    deadlines: true, caseUpdates: true, fraudAlerts: true, email: false, sound: true,
+  const [notifications, setNotifications] = useState<Record<string, boolean>>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(NOTIF_KEY) || "null");
+      if (stored) return stored;
+    } catch {}
+    return { deadlines: true, caseUpdates: true, fraudAlerts: true, email: false, sound: true };
   });
 
   const [account, setAccount] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "") || null; } catch { return null; }
-    } || {
-    name: "Admin User", email: "admin@legalease.com", role: "Senior Legal Analyst", org: "LegalEase AI Corp",
+    try {
+      const stored = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null");
+      if (stored) return stored;
+    } catch {}
+    return { name: "Admin User", email: "admin@legalease.com", role: "Senior Legal Analyst", org: "LegalEase AI Corp" };
   });
 
   const toggleNotif = (key: string) => {
