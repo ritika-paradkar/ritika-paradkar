@@ -256,7 +256,7 @@ export default function UploadView() {
           <p className="font-medium text-foreground">{dragOver ? "Drop it here!" : "Drag & drop your file here"}</p>
           <p className="text-sm text-muted-foreground mt-1">Supports PDF, DOCX, images (OCR), and text files · Max 50MB</p>
         </div>
-        <input id="file-input" type="file" className="hidden" accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.webp" onChange={handleFileSelect} />
+        <input id="file-input" type="file" className="hidden" accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.webp,.mp4,.mov,.avi,.mkv,.webm" onChange={handleFileSelect} />
       </div>
 
       <AnimatePresence>
@@ -271,7 +271,7 @@ export default function UploadView() {
                 <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(1)} MB · {fileType.toUpperCase()}</p>
               </div>
             </div>
-            <Button onClick={handleVerify} disabled={verifying} className="gap-2">
+            <Button onClick={() => handleVerify()} disabled={verifying} className="gap-2">
               {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
               {verifying ? (verifyStatus || "Analyzing...") : "Verify & Analyze"}
             </Button>
