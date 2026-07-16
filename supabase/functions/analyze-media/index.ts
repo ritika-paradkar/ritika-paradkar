@@ -67,27 +67,62 @@ async function analyzeFrame(apiKey: string, frame: Frame): Promise<any | null> {
   }
 }
 
+const MAX_FRAMES = 20;
+const MAX_FRAME_B64 = 6_000_000; // ~4.5MB decoded
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // AuthN
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const token = authHeader.replace("Bearer ", "");
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const userId = userData.user.id;
+
     const payload: Payload = await req.json();
     const { fileName, kind, frames, meta, language } = payload;
-    if (!fileName || !kind || !Array.isArray(frames) || frames.length === 0) {
+    if (!fileName || !kind || !["image", "video"].includes(kind) || !Array.isArray(frames) || frames.length === 0) {
       return new Response(JSON.stringify({ error: "Invalid payload" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+    const safeName = String(fileName).slice(0, 255).replace(/[\u0000-\u001F]/g, " ");
+    // Validate frames
+    for (const f of frames) {
+      if (!f?.base64 || typeof f.base64 !== "string" || f.base64.length > MAX_FRAME_B64) {
+        return new Response(JSON.stringify({ error: "Frame too large or invalid" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (!/^image\/(png|jpe?g|webp|gif)$/i.test(String(f.mimeType || ""))) {
+        return new Response(JSON.stringify({ error: "Unsupported frame mime type" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    console.log(`[analyze-media] ${fileName} kind=${kind} frames=${frames.length}`);
+    console.log(`[analyze-media] user=${userId} ${safeName} kind=${kind} frames=${frames.length}`);
 
-    // Cap frames to prevent runaway cost
-    const cappedFrames = frames.slice(0, 20);
-
-    // Parallel frame analysis
+    const cappedFrames = frames.slice(0, MAX_FRAMES);
     const results = await Promise.all(cappedFrames.map((f) => analyzeFrame(LOVABLE_API_KEY, f)));
 
     // Detect rate limit / payment issues
@@ -175,10 +210,12 @@ serve(async (req) => {
       ? { priority: "medium", lawyerType: "Evidence Specialist", reasoning: "Some inconsistencies detected", action: "Request original/source file and metadata" }
       : { priority: "low", lawyerType: "General Counsel", reasoning: "Media appears authentic", action: "Proceed with standard evidence handling" };
 
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    // supabase client already scoped to caller above; RLS enforces user_id
+
 
     const docRecord = {
-      file_name: fileName,
+      user_id: userId,
+      file_name: safeName,
       file_type: kind,
       file_size: `${(meta.sizeBytes / 1024 / 1024).toFixed(1)} MB`,
       status: finalStatus,
