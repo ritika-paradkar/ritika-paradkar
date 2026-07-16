@@ -86,11 +86,6 @@ export default function AuthPage() {
             {mode === "signin" ? "Sign up" : "Sign in"}
           </button>
         </div>
-        <div className="text-center mt-2">
-          <button onClick={() => navigate("/")} className="text-xs text-muted-foreground hover:text-foreground">
-            Continue as guest →
-          </button>
-        </div>
       </motion.div>
     </div>
   );
