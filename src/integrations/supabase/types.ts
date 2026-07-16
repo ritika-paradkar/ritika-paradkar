@@ -70,6 +70,7 @@ export type Database = {
           file_name: string
           file_url: string | null
           id: string
+          user_id: string | null
           version_number: number
         }
         Insert: {
@@ -79,6 +80,7 @@ export type Database = {
           file_name: string
           file_url?: string | null
           id?: string
+          user_id?: string | null
           version_number?: number
         }
         Update: {
@@ -88,6 +90,7 @@ export type Database = {
           file_name?: string
           file_url?: string | null
           id?: string
+          user_id?: string | null
           version_number?: number
         }
         Relationships: [
@@ -125,6 +128,7 @@ export type Database = {
           tags: string[] | null
           timeline: Json | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           alerts?: Json | null
@@ -150,6 +154,7 @@ export type Database = {
           tags?: string[] | null
           timeline?: Json | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           alerts?: Json | null
@@ -175,6 +180,7 @@ export type Database = {
           tags?: string[] | null
           timeline?: Json | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
